@@ -1,0 +1,397 @@
+'use client';
+
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { AppSettings, CartItem, Order, OrderStatus, Product } from '@/types';
+import { DEFAULT_SETTINGS, INITIAL_ORDERS, INITIAL_PRODUCTS } from './constants';
+
+interface StoreContextType {
+  settings: AppSettings;
+  updateSettings: (newSettings: Partial<AppSettings>) => void;
+  resetSettings: () => void;
+
+  products: Product[];
+  addProduct: (product: Omit<Product, 'id'>) => void;
+  updateProduct: (id: string, product: Partial<Product>) => void;
+  deleteProduct: (id: string) => void;
+  resetProducts: () => void;
+
+  orders: Order[];
+  createOrder: (orderData: Omit<Order, 'bookingCode' | 'createdAt' | 'status' | 'statusHistory'>) => Order;
+  updateOrderStatus: (bookingCode: string, newStatus: OrderStatus, note?: string) => void;
+  updateOrderTracking: (bookingCode: string, trackingNumber: string) => void;
+  getOrderByCode: (code: string) => Order | undefined;
+  resetOrders: () => void;
+
+  cart: CartItem[];
+  addToCart: (item: Omit<CartItem, 'id'>) => void;
+  updateCartQty: (id: string, delta: number) => void;
+  removeFromCart: (id: string) => void;
+  clearCart: () => void;
+  cartTotalCount: number;
+  cartGrandTotalIDR: number;
+
+  isCartOpen: boolean;
+  setIsCartOpen: (open: boolean) => void;
+  isCustomModalOpen: boolean;
+  setIsCustomModalOpen: (open: boolean) => void;
+
+  calculatePrice: (priceCNY: number) => {
+    rawIDR: number;
+    feeIDR: number;
+    finalPriceIDR: number;
+  };
+  formatIDR: (val: number) => string;
+  formatCNY: (val: number) => string;
+}
+
+const StoreContext = createContext<StoreContextType | null>(null);
+
+const STORAGE_KEYS = {
+  SETTINGS: 'jastipos_settings_v1',
+  PRODUCTS: 'jastipos_products_v1',
+  ORDERS: 'jastipos_orders_v1',
+  CART: 'jastipos_cart_v1',
+};
+
+export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
+  const [settings, setSettings] = useState<AppSettings>(() => {
+    if (typeof window === 'undefined') return DEFAULT_SETTINGS;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.SETTINGS);
+      return stored ? JSON.parse(stored) : DEFAULT_SETTINGS;
+    } catch {
+      return DEFAULT_SETTINGS;
+    }
+  });
+
+  const [products, setProducts] = useState<Product[]>(() => {
+    if (typeof window === 'undefined') return INITIAL_PRODUCTS;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
+      return stored ? JSON.parse(stored) : INITIAL_PRODUCTS;
+    } catch {
+      return INITIAL_PRODUCTS;
+    }
+  });
+
+  const [orders, setOrders] = useState<Order[]>(() => {
+    if (typeof window === 'undefined') return INITIAL_ORDERS;
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.ORDERS);
+      return stored ? JSON.parse(stored) : INITIAL_ORDERS;
+    } catch {
+      return INITIAL_ORDERS;
+    }
+  });
+
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const stored = localStorage.getItem(STORAGE_KEYS.CART);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isCustomModalOpen, setIsCustomModalOpen] = useState(false);
+
+  // Sync to LocalStorage when state changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [settings]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(products));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [products]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.ORDERS, JSON.stringify(orders));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [orders]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEYS.CART, JSON.stringify(cart));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [cart]);
+
+  // Price calculation helper
+  const calculatePrice = (priceCNY: number) => {
+    const rawIDR = Math.round(priceCNY * settings.exchangeRateCNY);
+    const calculatedFee = Math.round((priceCNY * settings.exchangeRateCNY * settings.feePercentage) / 100);
+    const feeIDR = Math.max(calculatedFee, settings.minFeeIDR);
+    const finalPriceIDR = rawIDR + feeIDR;
+    return { rawIDR, feeIDR, finalPriceIDR };
+  };
+
+  const formatIDR = (val: number) => {
+    return new Intl.NumberFormat('id-ID', {
+      style: 'currency',
+      currency: 'IDR',
+      maximumFractionDigits: 0,
+    }).format(val);
+  };
+
+  const formatCNY = (val: number) => {
+    return `¥${val.toLocaleString('zh-CN', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}`;
+  };
+
+  // Settings
+  const updateSettings = (newSettings: Partial<AppSettings>) => {
+    setSettings((prev) => ({ ...prev, ...newSettings }));
+  };
+
+  const resetSettings = () => {
+    setSettings(DEFAULT_SETTINGS);
+  };
+
+  // Products
+  const addProduct = (productData: Omit<Product, 'id'>) => {
+    const newProduct: Product = {
+      ...productData,
+      id: `prod-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    };
+    setProducts((prev) => [newProduct, ...prev]);
+  };
+
+  const updateProduct = (id: string, updated: Partial<Product>) => {
+    setProducts((prev) => prev.map((p) => (p.id === id ? { ...p, ...updated } : p)));
+  };
+
+  const deleteProduct = (id: string) => {
+    setProducts((prev) => prev.filter((p) => p.id !== id));
+  };
+
+  const resetProducts = () => {
+    setProducts(INITIAL_PRODUCTS);
+  };
+
+  // Orders
+  const createOrder = (orderData: Omit<Order, 'bookingCode' | 'createdAt' | 'status' | 'statusHistory'>): Order => {
+    const now = new Date();
+    const yearMonth = now.toISOString().slice(0, 7).replace('-', '');
+    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+    const bookingCode = `JST-${yearMonth}-${randomSuffix}`;
+
+    const timestampStr = now.toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }) + ' WIB';
+
+    const newOrder: Order = {
+      ...orderData,
+      bookingCode,
+      status: 'MENUNGGU_KONFIRMASI',
+      createdAt: now.toISOString(),
+      statusHistory: [
+        {
+          status: 'MENUNGGU_KONFIRMASI',
+          timestamp: timestampStr,
+          title: 'Pesanan Berhasil Dibuat',
+          description: `Pesanan telah masuk ke sistem. Mohon konfirmasi bukti transfer ${
+            orderData.paymentType === 'DP_50' ? 'DP 50%' : 'Pelunasan'
+          } via WhatsApp.`,
+          location: 'Jakarta',
+        },
+      ],
+    };
+
+    setOrders((prev) => [newOrder, ...prev]);
+    return newOrder;
+  };
+
+  const updateOrderStatus = (bookingCode: string, newStatus: OrderStatus, note?: string) => {
+    const now = new Date();
+    const timestampStr = now.toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }) + ' WIB';
+
+    const statusTitleMap: Record<OrderStatus, { title: string; defaultDesc: string; location: string }> = {
+      MENUNGGU_KONFIRMASI: {
+        title: 'Menunggu Konfirmasi Pembayaran',
+        defaultDesc: 'Menunggu verifikasi bukti transfer dari pembeli.',
+        location: 'Jakarta',
+      },
+      BARANG_DIBELIKAN: {
+        title: 'Barang Sedang Dibelanjakan di China',
+        defaultDesc: 'Tim shopper sedang membeli dan menginspeksi barang langsung di Yangzhou/Taobao.',
+        location: 'Yangzhou, China',
+      },
+      DALAM_PERJALANAN: {
+        title: 'Dalam Penerbangan Cargo ke Indonesia',
+        defaultDesc: 'Paket telah masuk kargo internasional dalam perjalanan menuju bandara CGK Jakarta.',
+        location: 'Air Cargo Transit (China -> Indonesia)',
+      },
+      TIBA_DI_INDO: {
+        title: 'Tiba di Gudang Jakarta & Quality Check',
+        defaultDesc: 'Paket tiba dengan aman, lolos bea cukai dan selesai disortir.',
+        location: 'Warehouse Jakarta Barat',
+      },
+      DIKIRIM_KE_PEMBELI: {
+        title: 'Dikirim ke Alamat Pembeli',
+        defaultDesc: 'Paket diserahkan ke ekspedisi lokal untuk diantar ke alamat Anda.',
+        location: 'Ekspedisi Domestik',
+      },
+      SELESAI: {
+        title: 'Pesanan Selesai Diterima',
+        defaultDesc: 'Paket telah sampai dan diterima oleh pembeli dengan baik.',
+        location: 'Alamat Pembeli',
+      },
+      DIBATALKAN: {
+        title: 'Pesanan Dibatalkan',
+        defaultDesc: 'Pesanan dibatalkan atau stok barang di China habis.',
+        location: 'System',
+      },
+    };
+
+    setOrders((prev) =>
+      prev.map((ord) => {
+        if (ord.bookingCode !== bookingCode) return ord;
+        const info = statusTitleMap[newStatus];
+        const newHistory = [
+          ...ord.statusHistory,
+          {
+            status: newStatus,
+            timestamp: timestampStr,
+            title: info.title,
+            description: note || info.defaultDesc,
+            location: info.location,
+          },
+        ];
+        return {
+          ...ord,
+          status: newStatus,
+          statusHistory: newHistory,
+        };
+      })
+    );
+  };
+
+  const updateOrderTracking = (bookingCode: string, trackingNumber: string) => {
+    setOrders((prev) =>
+      prev.map((ord) => (ord.bookingCode === bookingCode ? { ...ord, trackingNumber } : ord))
+    );
+  };
+
+  const getOrderByCode = (code: string) => {
+    const cleanCode = code.trim().toUpperCase();
+    return orders.find((o) => o.bookingCode.toUpperCase() === cleanCode);
+  };
+
+  const resetOrders = () => {
+    setOrders(INITIAL_ORDERS);
+  };
+
+  // Cart
+  const addToCart = (item: Omit<CartItem, 'id'>) => {
+    setCart((prev) => {
+      // If it's a catalog item and already in cart, increment quantity
+      if (!item.isCustom && item.productId) {
+        const existingIndex = prev.findIndex((i) => i.productId === item.productId);
+        if (existingIndex > -1) {
+          const updated = [...prev];
+          updated[existingIndex].qty += item.qty;
+          return updated;
+        }
+      }
+      // Otherwise add as new
+      const newItem: CartItem = {
+        ...item,
+        id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      };
+      return [...prev, newItem];
+    });
+  };
+
+  const updateCartQty = (id: string, delta: number) => {
+    setCart((prev) =>
+      prev
+        .map((item) => {
+          if (item.id === id) {
+            const newQty = item.qty + delta;
+            return newQty > 0 ? { ...item, qty: newQty } : null;
+          }
+          return item;
+        })
+        .filter(Boolean) as CartItem[]
+    );
+  };
+
+  const removeFromCart = (id: string) => {
+    setCart((prev) => prev.filter((item) => item.id !== id));
+  };
+
+  const clearCart = () => {
+    setCart([]);
+  };
+
+  const cartTotalCount = cart.reduce((acc, curr) => acc + curr.qty, 0);
+  const cartGrandTotalIDR = cart.reduce((acc, curr) => acc + curr.calculatedPriceIDR * curr.qty, 0);
+
+  return (
+    <StoreContext.Provider
+      value={{
+        settings,
+        updateSettings,
+        resetSettings,
+        products,
+        addProduct,
+        updateProduct,
+        deleteProduct,
+        resetProducts,
+        orders,
+        createOrder,
+        updateOrderStatus,
+        updateOrderTracking,
+        getOrderByCode,
+        resetOrders,
+        cart,
+        addToCart,
+        updateCartQty,
+        removeFromCart,
+        clearCart,
+        cartTotalCount,
+        cartGrandTotalIDR,
+        isCartOpen,
+        setIsCartOpen,
+        isCustomModalOpen,
+        setIsCustomModalOpen,
+        calculatePrice,
+        formatIDR,
+        formatCNY,
+      }}
+    >
+      {children}
+    </StoreContext.Provider>
+  );
+};
+
+export const useStore = () => {
+  const context = useContext(StoreContext);
+  if (!context) {
+    throw new Error('useStore must be used within a StoreProvider');
+  }
+  return context;
+};
