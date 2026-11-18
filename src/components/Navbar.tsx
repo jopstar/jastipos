@@ -10,7 +10,6 @@ import {
   PackageCheck, 
   Menu, 
   X,
-  Settings,
   Sparkles
 } from 'lucide-react';
 
@@ -41,14 +40,7 @@ export default function Navbar() {
               <Plane className="w-3.5 h-3.5 text-indigo-400" />
               Est. Tiba: <strong className="text-white">{settings.estArrivalDate}</strong>
             </span>
-            <Link 
-              href="/admin" 
-              className="inline-flex items-center gap-1 text-slate-400 hover:text-white transition-colors"
-              title="Mini Admin Dashboard"
-            >
-              <Settings className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Admin</span>
-            </Link>
+
           </div>
         </div>
       </div>
@@ -182,13 +174,7 @@ export default function Navbar() {
           >
             🔍 Lacak Status Pesanan (Booking Code)
           </Link>
-          <Link
-            href="/admin"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block px-3 py-2 rounded-lg text-base font-medium text-slate-600 hover:bg-slate-100"
-          >
-            ⚙️ Mini Admin View
-          </Link>
+
         </div>
       )}
     </header>

@@ -12,7 +12,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   estLocalShippingDate: '12 Desember 2026',
   adminWhatsapp: '628980706665',
   totalLuggageQuotaKg: 60,
-  usedLuggageQuotaKg: 1,
+  usedLuggageQuotaKg: 0,
   notificationBanner: '📢 Open PO Yangzhou Batch 2 Sedang Berjalan! Tutup PO dalam hitungan hari. Kuota bagasi terbatas!',
 };
 
