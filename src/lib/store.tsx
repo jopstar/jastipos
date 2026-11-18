@@ -58,7 +58,17 @@ export const StoreProvider = ({ children }: { children: React.ReactNode }) => {
     if (typeof window === 'undefined') return DEFAULT_SETTINGS;
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.SETTINGS);
-      return stored ? JSON.parse(stored) : DEFAULT_SETTINGS;
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Always sync these operational fields from DEFAULT_SETTINGS
+        // so changes in constants.ts take effect immediately
+        return {
+          ...parsed,
+          usedLuggageQuotaKg: DEFAULT_SETTINGS.usedLuggageQuotaKg,
+          totalLuggageQuotaKg: DEFAULT_SETTINGS.totalLuggageQuotaKg,
+        };
+      }
+      return DEFAULT_SETTINGS;
     } catch {
       return DEFAULT_SETTINGS;
     }
